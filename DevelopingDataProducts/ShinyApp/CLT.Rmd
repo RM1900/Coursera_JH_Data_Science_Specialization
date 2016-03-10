@@ -1,0 +1,12 @@
+[Reference](https://en.wikipedia.org/wiki/Central_limit_theorem): "In probability theory, the central limit theorem (CLT) states that, given certain conditions, the arithmetic mean of a sufficiently large number of iterates of independent random variables, each with a well-defined expected value and well-defined variance, will be approximately normally distributed, regardless of the underlying distribution."
+
+The exponential distribution can be simulated in R with rexp(n, lambda) where lambda is the rate parameter and n is the number of iterations you select on the slider. For this demonstration I used lambda = 0.2. The theoretical mean of the exponential distribution is 1/lambda and the standard deviation is also 1/lambda. As lambda is .2, the theoretical mean and standard deviation are 1 / 0.2 = 5.  Variance is the square of the standard deviation and for the exponential distribution with a lambda of 0.2 is 5^2 = 25.
+
+The density histogram on the top shows that the exponential distribution is not normally distributed regardless of how large N is that you have selected for the number of iterations.
+
+The density histogram on the bottom shows that as you increase the number of iterations the mean of n exponentials will become approximately normally distributed.  e.g., the distribution of
+
+    simulation <- data.frame(x = sapply(1:n, function(x) {mean(rexp(n, lambda))}))
+will become approximately normallly distributed as n increases.
+
+In each histogram I have overlayed a normal distribution curve and indicated the mean of the distribution with a red vertical line. Below each histogram I have compared the mean, variance, theoretical mean, and the theoretical variance for the n iterations you have selected.

@@ -1,0 +1,123 @@
+---
+title: "Analysis of variables affecting a car's fuel efficiency"
+author: Robert Merriman
+date: November 22, 2015
+output: pdf_document
+---
+# **Executive Summary**
+```{r, echo = F, results = "hide", message = F}
+library(car)
+library(MASS)
+library(ggplot2)
+library(sm)
+library(gridExtra)
+```
+I work for Motor Trend, a magazine about the automobile industry. I analyzed the mtcars car data to answer the following two questions:
+
+1. Is an automatic or manual transmission better for MPG?
+2. Quantify the MPG difference between automatic and manual transmissions?
+
+For the data analyzed I concluded that a car with a manual tranmission is likely to have a higher fuel efficiency (MPG) than a car with an automatic transmission. However, upon building linear regressions, I concluded that the transmission type did not statistically significant affect MPG and the is confounded by other variables. As the data did not include any cars that were identical except for the transmission type, further analysis may be needed.
+
+# **Methodology**
+## **Source Data**
+The source data is mtcars in the R datasets library. "The data was extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models)."^Reference 1, figure set 1^
+
+## **Data Manipulation**
+I converted the variables vs and am as factors and I relabled the am factors to Autmoatic and Manual to improve understanding the visuals. I did not convert the variables gear, cyl, or carb as factors as the variables are not dichotomous or ordinal. For example increasing the number of gears has enabled better engineering optimization of a car's fuel efficiency^Reference 2^.
+```{r, echo = F, results = "hide"}
+M1 <- mtcars
+M1$vs <- as.factor(M1$vs)
+M1$am <- factor(M1$am, labels = c("Automatic", "Manual"))
+mpg <- M1$mpg
+meanMPG <- mean(mpg)
+sdMPG <- sd(mpg)
+```
+
+## **Data Exploration**
+In exploring the data I concluded that it is reasonable to consider MPG approximately normally distributed. I noted that there are outliers at the right tail due to some cars with manual transmission having high MPG.^Figure set 2^
+
+## **t.test of MPG ~ AM**
+```{r, echo = F, results = "hide"}
+tt <- t.test(mpg ~ am, data = mtcars)
+```
+The mean mileage of cars with an automatic transmission is `r round(mean(mtcars$mpg[mtcars$am == "0"],3))` mpg and for cars with a manual transmission is `r round(mean(mtcars$mpg[mtcars$am == "1"],3))` mpg. Treating the MPG data as i.i.d. and normally distributed, by t.test comparing MPG to the transmission type, the 95% confidence interval of the difference in mean gas mileage is between `r abs(round(tt$conf.int[2],3))` and `r abs(round(tt$conf.int[1],3))` mpg. As the mean does not include 0 and the p.value `r round(tt$p.value,4)` is less than an alpha level of 0.05, the difference is statistically significant.
+
+# **Model Selection for linear regerssion**
+I chose to use a nested model selection using ANOVA.  
+```{r, echo = F, results = "hide"}
+# nested model selection
+lmam <- lm(mpg ~ am, data = M1)
+lmwt <- update(lmam, mpg ~ am + wt, data = M1)
+lmcyl <- update(lmam, mpg ~ am + wt + cyl, data = M1) # anova best model
+lmdisp <- update(lmam, mpg ~ am + wt + cyl + disp, data = M1)
+lmhp <- update(lmam, mpg ~ am + wt + cyl + disp + hp, data = M1)
+lmdrat <- update(lmam, mpg ~ am + wt + cyl + disp + hp + drat, data = M1)
+lmqsec <- update(lmam, mpg ~ am + wt + cyl + disp + hp + drat + qsec, data = M1)
+lmvs <- update(lmam, mpg ~ am + wt + cyl + disp + hp + drat + qsec + vs, data = M1)
+lmgear <- update(lmam, mpg ~ am + wt + cyl + disp + hp + drat + qsec + vs + gear, data = M1)
+lmcarb <- update(lmam, mpg ~ am + wt + cyl + disp + hp + drat + qsec + vs + gear + carb, data = M1)
+lmANOVA <- anova(lmam, lmwt, lmcyl, lmdisp, lmhp, lmdrat, lmqsec, lmvs, lmgear, lmcarb)
+lmA <- lmANOVA$call
+```
+For the nested model section approach using ANOVA the best regression model was (mpg ~ am + wt + cyl) which did not find transmission type to be statistically significant and weight and cylinders were statistically significant confouders (at an alpha of 0.05).
+
+### **Normalacy and residuals**
+
+# **Appendix**
+## **Figure set 1: basic data exploration**
+```{r, echo = F, warning = F, message = F}
+summary(M1)
+str(M1)
+par(mfrow=c(1,1))
+p1 <- ggplot(M1, aes(x=cyl, y=mpg, color=am)) + geom_point() + ggtitle("MPG by cyclinders") + xlab("Cylinders") + ylab("MPG")
+p2 <- ggplot(M1, aes(x=wt, y=mpg, color=am)) + geom_point() + ggtitle("MPG by weight") + xlab("Weight") + ylab("MPG")
+p3 <- ggplot(M1, aes(x=qsec, y=mpg, color=am)) + geom_point() + ggtitle("MPG by qsec") + xlab("Time (s) for quarter mile") + ylab("MPG")
+p4 <- ggplot(data = M1, aes(x=factor(am), y=mpg)) + geom_boxplot() + ggtitle("MPG by transmission type") + xlab("Transmission type") + ylab("MPG")
+grid.arrange(p1, p2, p3, p4)
+```
+
+## **Figure set 2: MPG distribution**
+```{r, echo = F}
+par(mfrow=c(2,2))
+
+# frequency histogram
+histMPG<-hist(mpg, breaks = 10, density = 20, col = "lightgray", xlab = "MPG", main = "MPG with normal\ndistribution overlay") 
+xfit<-seq(min(mpg), max(mpg), length=40) 
+yfit<-dnorm(xfit, mean = meanMPG, sd = sdMPG) 
+yfit <- yfit*diff(histMPG$mids[1:2]) * length(mpg) 
+lines(xfit, yfit, col = "black", lwd = 2)
+
+# density histogram
+hist(mpg, density=20, breaks=10, prob=TRUE, 
+     xlab = "MPG", ylim=c(0, .12), 
+     main = "MPG probabilty histogram with\nnormal ndistribution overlay")
+curve(dnorm(x, mean = meanMPG, sd = sdMPG), 
+       col = "darkblue", lwd = 2, add = TRUE, yaxt = "n")
+
+# Kernel Density Plot
+plot(density(mtcars$mpg), main = "MPG kernel density", ylim=c(0., .07))
+
+# densities by am
+sm.density.compare(M1$mpg, M1$am, xlab="mpg")
+title(main="MPG kernel distribution\nby transmission")
+colfill<-c(2:(2+length(levels(M1$am)))) 
+legend("topright",levels(M1$am), fill=colfill) 
+```
+
+## **Figure set 3**
+### **ANOVA**
+```{r, echo = F}
+lmANOVA
+plot(lmcyl)
+```
+
+# **References**
+1. [mtcars dataset](http://www.inside-r.org/r-doc/datasets/mtcars)
+2. [Gear article](http://www.autoblog.com/2010/08/18/greenlings-why-do-automatic-transmissions-now-get-better-fuel-e/)
+3. [fivethirtyeight](http://fivethirtyeight.com/features/science-isnt-broken/#part2)
+4. [QQNorm](https://en.wikipedia.org/wiki/Q–Q_plot)
+5. [Shapiro-Wilk normality test](https://en.wikipedia.org/wiki/Shapiro–Wilk_test)
+6. [r-tutur.com](http://www.r-tutor.com/elementary-statistics/inference-about-two-populations/population-mean-between-two-independent-samples)
+7. [Variances explained](http://varianceexplained.org/RData/code/code_lesson3/)
+8. [Histogram Blog](http://asbidyarthy.blogspot.com/2012/01/histograms-and-density-plots.html)
